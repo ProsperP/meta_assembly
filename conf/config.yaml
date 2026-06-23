@@ -1,0 +1,40 @@
+#samples: "fq_list.txt"
+samples: "../test_fq_list.txt"
+
+
+# Parameters for KneadData
+kneaddata:
+    skip: false
+    outdir: "01.QC"
+    threads: 16
+    bowtie2_db: "/work/home/prosperp/Databases/genome/Homo_sapiens_hg39_T2T_Bowtie2_v0.1/hg_39"
+    lead_qual: 3
+    trail_qual: 3
+    #adapter: TruSeq2
+    adapter: "/work/share/acqtjvjc9x/20260510_pregnancy_metagenome/mgi_adapters.fa"
+    head_crop: 6
+    min_len: 50
+    window_size: 5
+    avg_quality: 25
+
+# Parameters for spades
+spades:
+    outdir: "01.assembly"
+    threads: 20
+
+quast:
+
+binning:
+    skip: false
+    outdir: "02.binning"
+    threads: 20
+
+    comebin:
+        skip: false
+
+    semibin2:
+        skip: false
+
+    metabat2:
+        skip: false
+        min_len: 1500
