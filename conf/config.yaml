@@ -1,12 +1,10 @@
-#samples: "fq_list.txt"
-samples: "../test_fq_list.txt"
+samples: "clean_fq_list.txt"
 
 
 # Parameters for KneadData
 kneaddata:
-    skip: false
+    skip: true
     outdir: "01.QC"
-    threads: 16
     bowtie2_db: "/work/home/prosperp/Databases/genome/Homo_sapiens_hg39_T2T_Bowtie2_v0.1/hg_39"
     lead_qual: 3
     trail_qual: 3
@@ -18,23 +16,71 @@ kneaddata:
     avg_quality: 25
 
 # Parameters for spades
-spades:
-    outdir: "01.assembly"
-    threads: 20
+assembly:
+    outdir: "02.assembly"
+    method: "megahit"
+    min_len: 1000
 
 quast:
+    skip: false
+    outdir: "02.assembly"
 
 binning:
     skip: false
-    outdir: "02.binning"
-    threads: 20
+    outdir: "03.binning"
 
     comebin:
-        skip: false
-
+        skip: true
+        ext_args: ""
     semibin2:
         skip: false
-
+        ext_args: "--environment human_gut"
     metabat2:
         skip: false
         min_len: 1500
+        ext_args: ""
+    metadecoder:
+        skip: false
+        ext_args: "--min_sequence_length 2000"
+    concoct:
+        skip: false
+        min_len: 1000
+        ext_args: ""
+
+    checkm2:
+        skip: false
+        db: "/work/home/prosperp/Databases/checkM/CheckM2_database/uniref100.KO.1.dmnd"
+        ext_args: ""
+
+    refinement:
+        skip: false
+        # method: metaWRAP or MAGScoT
+        method: MAGScoT
+        metaWRAP:
+            completeness: 50
+            contamination: 5
+            skip_checkm: false
+            skip_consolidation: false
+            # ambiguous_method: keep, partial, remove
+            ambiguous_method: partial
+        magscot:
+            magscot_dir: /work/home/prosperp/src/MAGScoT
+            tigr_db: /work/home/prosperp/src/MAGScoT/hmm/gtdbtk_rel207_tigrfam.hmm
+            pfam_db: /work/home/prosperp/src/MAGScoT/hmm/gtdbtk_rel207_Pfam-A.hmm
+            contamination: 0.5
+
+dereplication:
+    mags_ani: 0.99
+    srgs_ani: 0.95
+
+annotation:
+    outdir: "04.annotation"
+    gtdbtk:
+        skip: false
+        db: "/work/home/prosperp/Databases/gtdb/release232/"
+    bakta:
+        skip: false
+        db: "/work/home/prosperp/Databases/bakta/db/"
+
+coverm:
+    outdir: "05.profile"
