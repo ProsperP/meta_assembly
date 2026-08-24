@@ -1,61 +1,66 @@
-process concoct {
+process CONCOCT {
     tag sample
-    label 'process_high'
+    label 'process_medium'
 
     conda "/work/home/prosperp/src/miniforge3/envs/concoct_env"
 
     input:
-    tuple val(sample), path(assembly), path(bam)
-    //val params
+    tuple val(sample), path(assembly), val(bam)
+    val params
 
     output:
     tuple val(sample), val('CONCOCT'), path("${sample}/concoct/concoct_bins/"), emit: bin_folder
     tuple val(sample), path("${sample}/concoct/concoct_bins/*.fa.gz"), emit: bins
-    tuple val(sample), path("${sample}/concoct/comebin_res.tsv"),   emit: tsv
-    tuple val(sample), path("${sample}/concoct/embeddings.tsv"),    emit: embeddings
-    tuple val(sample), path("${sample}/concoct/covembeddings.tsv"), emit: covembeddings
-    tuple val(sample), path("${sample}/concoct/concoct.log"), emit: log
+    tuple val(sample), path("${sample}/concoct/concoct_depth.tsv"), emit: concoct_depth
+    tuple val(sample), path("${sample}/concoct/log.txt"), emit: log
     path "versions.yml", emit: versions
 
     script:
     """
-    mkdir ${sample}/
+    outdir=${sample}/concoct
+    mkdir -p \${outdir}
+
     pigz -d -c ${assembly} > ${sample}/${sample}_assembly.fa
 
-    # indexing .bam alignment files...
     samtools index -@ ${task.cpus} -b ${bam}
 
-    # cutting up contigs into 10kb fragments for CONCOCT...
     cut_up_fasta.py \\
         ${sample}/${sample}_assembly.fa \\
-        -c 10000 --merge_last -o 0 \\
-        -b assembly_10K.bed \\
-        > ${sample}/${sample}_assembly_10K.fa
+        --chunk_size 10000 \\
+        --merge_last --overlap_size 0 \\
+        --bedfile \${outdir}/assembly_10K.bed \\
+        > \${outdir}/assembly_10K.fa
 
-    # estimating contig fragment coverage...
     concoct_coverage_table.py \\
-        assembly_10K.bed \\
-        ${out}/work_files/*.bam \\
-        > ${out}/work_files/concoct_depth.txt
+        \${outdir}/assembly_10K.bed \\
+        ${bam} \\
+        > \${outdir}/concoct_depth.tsv
 
     # Starting binning with CONCOCT...
-    concoct -l $len -t $threads \\
-        --coverage_file ${out}/work_files/concoct_depth.txt \\
-        --composition_file ${out}/work_files/assembly_10K.fa \\
-        -b ${out}/work_files/concoct_out
+    concoct \\
+        --threads ${task.cpus} \\
+        -l ${params.min_len} \\
+        --coverage_file \${outdir}/concoct_depth.tsv \\
+        --composition_file \${outdir}/assembly_10K.fa \\
+        --basename \${outdir}/
 
-    # merging 10kb fragments back into contigs
     merge_cutup_clustering.py \\
-        ${out}/work_files/concoct_out/clustering_gt${len}.csv \\
-        > ${out}/work_files/concoct_out/clustering_gt${len}_merged.csv
+        \${outdir}/clustering_gt${params.min_len}.csv \\
+        > \${outdir}/clustering_gt${params.min_len}_merged.csv
 
     # splitting contigs into bins
-    split_concoct_bins.py \\
-        ${out}/work_files/concoct_out/clustering_gt${len}_merged.csv \\
-        ${out}/work_files/assembly.fa \\
-        ${out}/concoct_bins
+    mkdir \${outdir}/concoct_bins
+    extract_fasta_bins.py \\
+        ${sample}/${sample}_assembly.fa \\
+        \${outdir}/clustering_gt${params.min_len}_merged.csv \\
+        --output_path \${outdir}/concoct_bins
 
-    find ${sample}/comebin/comebin_bins/*.fa -exec pigz {} \\;
+    find \${outdir}/concoct_bins/*.fa -exec pigz {} \\;
+
+    # Cleanup
+    rm ${bam}.bai
+    rm ${sample}/${sample}_assembly.fa
+    rm \${outdir}/assembly_10K* \${outdir}/*.csv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -67,12 +72,8 @@ process concoct {
     """
     mkdir -p ${sample}/concoct/concoct_bins
 
-    echo '' | gzip > ${sample}/concoct/concoct_bins/1.fa.gz
-    echo '' | gzip > ${sample}/concoct/concoct_bins/2.fa.gz
-
-    touch ${sample}/comebin/comebin_res.tsv
-    touch ${sample}/comebin/{embeddings,covembeddings}.tsv
-    touch ${sample}/concoct/concoct.log
+    echo '' | gzip > ${sample}/concoct/concoct_bins/{1,2,3,4,5}.fa.gz
+    touch ${sample}/concoct/log.txt ${sample}/concoct/concoct_depth.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

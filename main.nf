@@ -45,7 +45,11 @@ workflow {
     filter_assembly(spades.out.scaffolds, params.spades)
     quast(filter_assembly.out.final_assembly)
     BINNING(ch_clean_reads, filter_assembly.out.final_assembly, params.binning)
-    BIN_REFINEMENT(BINNING.out.bin_folders, params.binning)
+    BIN_REFINEMENT(
+        filter_assembly.out.final_assembly,
+        BINNING.out.bin_folders,
+        params.binning
+    )
 
     publish:
     clean_fqs = ch_clean_reads.ifEmpty([])
