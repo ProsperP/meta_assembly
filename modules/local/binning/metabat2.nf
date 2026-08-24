@@ -1,10 +1,11 @@
-process metabat2 {
+process METABAT2 {
     tag sample
+    label 'process_low'
 
     conda "/work/home/prosperp/src/miniforge3/envs/meta_assembly"
 
     input:
-    tuple val(sample), path(assembly), path(bam)
+    tuple val(sample), path(assembly), val(bam)
     val params
 
     output:
@@ -12,7 +13,7 @@ process metabat2 {
     tuple val(sample), path("${sample}/metabat2/*.lowDepth.fa.gz"), emit: lowdepth, optional: true
     tuple val(sample), path("${sample}/metabat2/*.unbinned.fa.gz"), emit: unbinned, optional: true
     tuple val(sample), path("${sample}/metabat2/metabat2_bins/*[!lowDepth|tooShort|unbinned].fa.gz"),  emit: bins, optional: true
-    tuple val(sample), val('MataBAT2'), path("${sample}/metabat2/metabat2_bins/"),  emit: bin_folder, optional: true
+    tuple val(sample), val('MetaBAT2'), path("${sample}/metabat2/metabat2_bins/"),  emit: bin_folder, optional: true
     tuple val(sample), path("${sample}/metabat2/assembly_depth.txt"), emit: depth
     //tuple val(sample), path("*.tsv.gz"), emit: membership, optional: true
     path "versions.yml", emit: versions

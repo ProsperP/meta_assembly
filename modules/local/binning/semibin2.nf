@@ -1,11 +1,11 @@
-process semibin2 {
+process SEMIBIN2 {
     tag sample
-    label 'process_high'
+    label 'process_low'
 
     conda "/work/home/prosperp/src/miniforge3/envs/meta_assembly"
 
     input:
-    tuple val(sample), path(assembly), path(bam)
+    tuple val(sample), path(assembly), val(bam)
     val params
 
     output:
@@ -25,6 +25,7 @@ process semibin2 {
     SemiBin2 single_easy_bin \\
         --threads ${task.cpus} \\
         --self-supervised \\
+        ${params.ext_args} \\
         --input-fasta ${assembly} \\
         --input-bam ${bam} \\
         --output ${sample}/semibin2 \\

@@ -1,11 +1,11 @@
-process comebin {
+process COMEBIN {
     tag sample
     label 'process_high'
 
     conda "/work/home/prosperp/src/miniforge3/envs/comebin_env"
 
     input:
-    tuple val(sample), path(assembly), path(bam)
+    tuple val(sample), path(assembly), val(bam)
     //val params
 
     output:
@@ -33,6 +33,8 @@ process comebin {
     mv ${sample}/comebin/comebin_res_bins ${sample}/comebin/comebin_bins
 
     find ${sample}/comebin/comebin_bins/*.fa -exec pigz {} \\;
+
+    rm -rf ${sample}/data_augmentation
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

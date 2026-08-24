@@ -1,11 +1,15 @@
 /*
- * Binning with COMEBin, SemiBin2 and MetaBAT2
+ * Binning with COMEBin, SemiBin2, MetaBAT2, MetaDecoder and ConCoCT.
  */
 
-include { bwa_mem } from '../modules/local/binning/bwa_assembly_align.nf'
-include { comebin } from '../modules/local/binning/comebin.nf'
-include { semibin2 } from '../modules/local/binning/semibin2.nf'
-include { metabat2 } from '../modules/local/binning/metabat2.nf'
+include { bwa_mem } from '../modules/local/binning/bwa_assembly_align'
+include { COMEBIN } from '../modules/local/binning/comebin'
+include { SEMIBIN2 } from '../modules/local/binning/semibin2'
+include { METABAT2 } from '../modules/local/binning/metabat2'
+include { METADECODER } from '../modules/local/binning/metadecoder'
+include { CONCOCT } from '../modules/local/binning/concoct'
+include { CLEAN_BAM } from '../modules/local/binning/clean_bam'
+include { collectFlagFiles } from '../modules/local/collect_flag_files'
 
 
 workflow BINNING {
@@ -20,35 +24,61 @@ workflow BINNING {
     ch_bins = channel.empty()
     ch_bin_folders = channel.empty()
 
-    ch_bwa_mem_in = channel.empty()
-        .mix(ch_clean_fqs).join(ch_assembly)
-
+    ch_bwa_mem_in = ch_clean_fqs.join(ch_assembly)
     bwa_mem(ch_bwa_mem_in)
 
-    ch_binner_in = channel.empty()
-        .mix(ch_assembly).join(bwa_mem.out.bam)
+    def binnerCount = 0
+    ch_binner_in = ch_assembly.join(bwa_mem.out.bam)
 
-    comebin(ch_binner_in)
-    ch_versions = ch_versions.mix(comebin.out.versions)
+    if ( !params.comebin.skip ) {
+        COMEBIN(ch_binner_in)
+        ch_versions = ch_versions.mix(COMEBIN.out.versions)
+        ch_bins = ch_bins.mix(COMEBIN.out.bins)
+        ch_bin_folders = ch_bin_folders.mix(COMEBIN.out.bin_folder)
+        binnerCount += 1
+    }
 
-    semibin2(ch_binner_in, params.semibin2)
-    ch_versions = ch_versions.mix(semibin2.out.versions)
+    if ( !params.semibin2.skip ) {
+        SEMIBIN2(ch_binner_in, params.semibin2)
+        ch_versions = ch_versions.mix(SEMIBIN2.out.versions)
+        ch_bins = ch_bins.mix(SEMIBIN2.out.bins)
+        ch_bin_folders = ch_bin_folders.mix(SEMIBIN2.out.bin_folder)
+        binnerCount += 1
+    }
 
-    metabat2(ch_binner_in, params.metabat2)
-    ch_versions = ch_versions.mix(metabat2.out.versions)
+    if ( !params.metabat2.skip ) {
+        METABAT2(ch_binner_in, params.metabat2)
+        ch_versions = ch_versions.mix(METABAT2.out.versions)
+        ch_bins = ch_bins.mix(METABAT2.out.bins)
+        ch_bin_folders = ch_bin_folders.mix(METABAT2.out.bin_folder)
+        binnerCount += 1
+    }
 
-    ch_bins = ch_bins.mix(comebin.out.bins)
-    ch_bins = ch_bins.join(semibin2.out.bins)
-    ch_bins = ch_bins.join(metabat2.out.bins)
-    ch_bin_folders = ch_bin_folders
-        .mix(comebin.out.bin_folder)
-        .mix(semibin2.out.bin_folder)
-        .mix(metabat2.out.bin_folder)
-        .groupTuple()
+    if ( !params.metadecoder.skip ) {
+        METADECODER(ch_binner_in, params.metadecoder)
+        ch_versions = ch_versions.mix(METADECODER.out.versions)
+        ch_bins = ch_bins.mix(METADECODER.out.bins)
+        ch_bin_folders = ch_bin_folders.mix(METADECODER.out.bin_folder)
+        binnerCount += 1
+    }
 
+    if ( !params.concoct.skip ) {
+        CONCOCT(ch_binner_in, params.concoct)
+        ch_versions = ch_versions.mix(CONCOCT.out.versions)
+        ch_bins = ch_bins.mix(CONCOCT.out.bins)
+        ch_bin_folders = ch_bin_folders.mix(CONCOCT.out.bin_folder)
+        binnerCount += 1
+    }
+
+    log.info "Number of enabled binners: ${binnerCount}"
+
+    ch_bins = ch_bins.groupTuple(size: binnerCount)
+    ch_bin_folders = ch_bin_folders.groupTuple(size: binnerCount)
+
+    CLEAN_BAM(ch_bin_folders.join(bwa_mem.out.bam).join(bwa_mem.out.flag_file))
 
     emit:
-    assembly_bwa_align = ch_binner_in
+    //assembly_bwa_align = ch_binner_in
     bin_sets          = ch_bins.ifEmpty([])
     bin_folders       = ch_bin_folders
     //unbinned        = ch_unbinned
