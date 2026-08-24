@@ -70,10 +70,10 @@ workflow {
 output {
     clean_fqs { path "${params.kneaddata.outdir}/" }
     kneaddata_log { path "${params.kneaddata.outdir}/" }
-    spades_out { path "${params.spades.outdir}" }
-    spades_logs { path "${params.spades.outdir}" }
-    final_assembly { path "${params.spades.outdir}" }
-    quast_report { path "${params.spades.outdir}" }
+    assembly_out { path "${params.assembly.outdir}" }
+    assembly_log { path "${params.assembly.outdir}" }
+    final_assembly { path "${params.assembly.outdir}" }
+    quast_report { path "${params.assembly.outdir}" }
     assembly_bwa_align { path "${params.binning.outdir}" }
     bin_sets { path "${params.binning.outdir}" }
     //versions { path "${params.binning.outdir}" }
