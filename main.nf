@@ -8,6 +8,7 @@ include { QUAST } from './modules/local/quast'
 include { ASSEMBLY } from './subworkflows/assembly'
 include { BINNING } from './subworkflows/binning.nf'
 include { BIN_REFINEMENT } from './subworkflows/bin_refinement.nf'
+include { DEREPLICATION } from './subworkflows/dereplication'
 
 
 // define user-supplied parameters
@@ -54,6 +55,12 @@ workflow {
         params.binning
     )
 
+    DEREPLICATION(
+        BIN_REFINEMENT.out.refined_bins,
+        params.dereplication,
+        params.drep_batch_size
+    )
+
     publish:
     clean_fqs = ch_clean_reads.ifEmpty([])
     kneaddata_log = ch_kneaddata_log.ifEmpty([])
@@ -63,7 +70,10 @@ workflow {
     quast_report = ch_quast_report
     assembly_bwa_align = BINNING.out.assembly_bwa_align
     bin_sets = BINNING.out.bin_sets
-    //versions = BINNING.out.versionsa
+    refined_bins = BIN_REFINEMENT.out.refined_bins
+    refine_stats = BIN_REFINEMENT.out.refine_stats
+    mags = DEREPLICATION.out.mags.mix(DEREPLICATION.out.id_convert)
+    srgs = DEREPLICATION.out.srgs
 
 }
 
