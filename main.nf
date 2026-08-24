@@ -9,6 +9,7 @@ include { ASSEMBLY } from './subworkflows/assembly'
 include { BINNING } from './subworkflows/binning.nf'
 include { BIN_REFINEMENT } from './subworkflows/bin_refinement.nf'
 include { DEREPLICATION } from './subworkflows/dereplication'
+include { QUANT_BINS } from './subworkflows/quant_bins'
 
 
 // define user-supplied parameters
@@ -61,6 +62,8 @@ workflow {
         params.drep_batch_size
     )
 
+    QUANT_BINS(DEREPLICATION.out.mags, ch_clean_reads, params.coverm)
+
     publish:
     clean_fqs = ch_clean_reads.ifEmpty([])
     kneaddata_log = ch_kneaddata_log.ifEmpty([])
@@ -74,6 +77,7 @@ workflow {
     refine_stats = BIN_REFINEMENT.out.refine_stats
     mags = DEREPLICATION.out.mags.mix(DEREPLICATION.out.id_convert)
     srgs = DEREPLICATION.out.srgs
+    mags_profile = QUANT_BINS.out
 
 }
 
@@ -86,5 +90,9 @@ output {
     quast_report { path "${params.assembly.outdir}" }
     assembly_bwa_align { path "${params.binning.outdir}" }
     bin_sets { path "${params.binning.outdir}" }
-    //versions { path "${params.binning.outdir}" }
+    refined_bins { path "${params.binning.outdir}" }
+    refine_stats { path "${params.binning.outdir}" }
+    mags { path "${params.binning.outdir}" }
+    srgs { path "${params.binning.outdir}/SRGs" }
+    mags_profile { path "${params.coverm.outdir}" }
 }
