@@ -15,9 +15,7 @@ process spades {
     tuple val(sample), path("${sample}/*.assembly.gfa.gz"),     optional: true, emit: gfa
     tuple val(sample), path("${sample}/*.warnings.log"),        optional: true, emit: warnings
     tuple val(sample), path("${sample}/*.spades.log"), emit: log
-
-    when:
-    !params.skip
+    path "versions.yml", emit: versions
 
     script:
     def mem = task.memory.toGiga()
@@ -56,6 +54,11 @@ process spades {
         mv warnings.log ${sample}.warnings.log
     fi
     cd ..
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        metaSPAdes: \$( metaspades.py -v | grep -oP 'v[\\d.]+' )
+    END_VERSIONS
     """
 
     stub:
@@ -67,65 +70,90 @@ process spades {
     done
     touch ${sample}.assembly.gfa ${sample}.warnings.log ${sample}.spades.log
     cd ..
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        metaSPAdes: \$( metaspades.py -v | grep -oP 'v[\\d.]+' )
+    END_VERSIONS
     """
 }
 
 
-process filter_assembly {
+process megahit {
+    tag sample
+
+    conda "/work/home/prosperp/src/miniforge3/envs/meta_assembly"
+
+    input:
+    tuple val(sample), path(clean_fqs)
+    val min_len
+
+    output:
+    tuple val(sample), path("${sample}/${sample}.final_assembly.fa.gz"), emit: final_assembly
+    tuple val(sample), path("${sample}/log"), emit: log
+    path "versions.yml", emit: versions
+
+    script:
+    def mem = task.memory.toBytes()
+    """
+    mkdir -p ${sample}_megahit.tmp
+
+    megahit \\
+        -1 ${clean_fqs[0]} -2 ${clean_fqs[1]} \\
+        -o ${sample}/ \\
+        --tmp-dir ${sample}_megahit.tmp \\
+        -t ${task.cpus} -m ${mem} \\
+        --continue
+
+    if [ -d ${sample}_megahit.tmp ]; then
+        rm -rf ${sample}_megahit.tmp
+    fi
+
+    fix_megahit_contig_naming.py \\
+        ${sample}/final.contigs.fa ${min_len} \\
+        | gzip > ${sample}/${sample}.final_assembly.fa.gz
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        megahit: \$( megahit -v )
+    END_VERSIONS
+    """
+
+    stub:
+    """
+    mkdir ${sample}/
+    touch ${sample}/${sample}.final_assembly.fa.gz ${sample}/log
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        megahit: \$( megahit -v )
+    END_VERSIONS
+    """
+}
+
+
+process filterAssembly {
     tag sample
 
     conda "/work/home/prosperp/src/miniforge3/envs/meta_assembly"
 
     input:
     tuple val(sample), path(scaffolds)
-    val params
+    val min_len
 
     output:
     tuple val(sample), path("${sample}/${sample}.final_assembly.fa.gz"), emit: final_assembly
-    tuple val(sample), path("${sample}/${sample}.filter.log"), emit: log
 
     script:
     """
     mkdir ${sample}/
-    { seqkit seq --min-len ${params.min_len} ${scaffolds} \\
+    seqkit seq --min-len ${min_len} ${scaffolds} \\
         | gzip > ${sample}/${sample}.final_assembly.fa.gz
-        } 2> ${sample}/${sample}.filter.log
     """
 
     stub:
     """
     mkdir ${sample}/
     touch ${sample}/${sample}.final_assembly.fa.gz
-    touch ${sample}/${sample}.filter.log
-    """
-}
-
-process quast {
-    tag sample
-
-    conda "/work/home/prosperp/src/miniforge3/envs/meta_assembly"
-
-    input:
-    tuple val(sample), path(final_assembly)
-
-    output:
-    tuple val(sample), path("${sample}/quast/assembly_report.{html,pdf}"), emit: assembly_report
-    //tuple val(sample), path("${sample}/quast/quast.log"), emit: log
-
-    script:
-    """
-    quast -t ${task.cpus} \\
-        --output-dir ${sample}/quast \\
-        --min-contig 500 \\
-        --silent \\
-        ${final_assembly} \\
-        && mv ${sample}/quast/report.html ${sample}/quast/assembly_report.html \\
-        && mv ${sample}/quast/report.pdf ${sample}/quast/assembly_report.pdf
-    """
-
-    stub:
-    """
-    mkdir -p ${sample}/quast
-    touch ${sample}/quast/assembly_report.{html,pdf}
     """
 }

@@ -3,11 +3,9 @@
 
 // include pre-defined modules
 include { kneaddata } from './modules/local/kneaddata.nf'
-include {
-    spades
-    filter_assembly
-    quast
-} from './modules/local/assembly.nf'
+include { QUAST } from './modules/local/quast'
+
+include { ASSEMBLY } from './subworkflows/assembly'
 include { BINNING } from './subworkflows/binning.nf'
 include { BIN_REFINEMENT } from './subworkflows/bin_refinement.nf'
 
@@ -41,12 +39,17 @@ workflow {
         ch_kneaddata_log = ch_kneaddata_log.mix(kneaddata.out.log)
     }
 
-    spades(ch_clean_reads, params.spades)
-    filter_assembly(spades.out.scaffolds, params.spades)
-    quast(filter_assembly.out.final_assembly)
-    BINNING(ch_clean_reads, filter_assembly.out.final_assembly, params.binning)
+    ASSEMBLY(ch_clean_reads, params.assembly)
+    ch_final_assembly = ASSEMBLY.out.final_assembly
+    ch_assembly_out = ASSEMBLY.out.assembly_out
+    ch_assembly_log = ASSEMBLY.out.assembly_log
+
+    QUAST(ch_final_assembly)
+    ch_quast_report = QUAST.out.assembly_report
+
+    BINNING(ch_clean_reads, ch_final_assembly, params.binning)
     BIN_REFINEMENT(
-        filter_assembly.out.final_assembly,
+        ch_final_assembly,
         BINNING.out.bin_folders,
         params.binning
     )
@@ -54,19 +57,10 @@ workflow {
     publish:
     clean_fqs = ch_clean_reads.ifEmpty([])
     kneaddata_log = ch_kneaddata_log.ifEmpty([])
-    spades_out = channel.empty().mix(
-        spades.out.contigs,
-        spades.out.scaffolds,
-        spades.out.gene_clusters,
-        spades.out.transcripts,
-        spades.out.gfa
-    ).ifEmpty([])
-    spades_logs = channel.empty().mix(
-        spades.out.warnings,
-        spades.out.log
-    )
-    final_assembly = filter_assembly.out.final_assembly
-    quast_report = quast.out.assembly_report
+    assembly_out = ch_assembly_out
+    assembly_log = ch_assembly_log
+    final_assembly = ch_final_assembly
+    quast_report = ch_quast_report
     assembly_bwa_align = BINNING.out.assembly_bwa_align
     bin_sets = BINNING.out.bin_sets
     //versions = BINNING.out.versionsa
