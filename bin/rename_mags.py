@@ -118,7 +118,7 @@ def main():
         new_bin = new_mags_dir / f'{new_bin_id}.fa'
         bin_count += 1
 
-        id_convert_fh.write(f'{bin_file.rstrip('.fa')}\t{new_bin_id}\n')
+        id_convert_fh.write(f'{bin_file.rstrip(".fa")}\t{new_bin_id}\n')
 
         with new_bin.open('wt') as outfh:
             contig_num = 1
